@@ -1,15 +1,15 @@
-package internal
+package jsonparser
 
 import "bytes"
 
-func ParseJSON(data []byte) ([]*JsonNode, error) {
-	nodes := []*JsonNode{}
+func ParseJSON(data []byte) ([]*JsonMember, error) {
+	members := []*JsonMember{}
 	i := 0
-	parseValue(data, &i, nil, -1, 0, nil, &nodes, data)
-	return nodes, nil
+	parseValue(data, &i, nil, -1, 0, nil, &members, data)
+	return members, nil
 }
 
-func parseValue(data []byte, i *int, name NodeName, idx int, level int, parent *JsonNode, nodes *[]*JsonNode, full []byte) {
+func parseValue(data []byte, i *int, name MemberName, idx int, level int, parent *JsonMember, members *[]*JsonMember, full []byte) {
 	skipSpaces(data, i)
 	start := *i
 	terminal := false
@@ -18,27 +18,27 @@ func parseValue(data []byte, i *int, name NodeName, idx int, level int, parent *
 	case '{':
 		*i++
 
-		node := &JsonNode{name, idx, level, nil, false, parent}
+		node := &JsonMember{name, idx, level, nil, false, parent}
 		parent = node
-		end := parseObject(data, i, level, nodes, full, parent)
+		end := parseObject(data, i, level, members, full, parent)
 		if name != nil {
 			node.Value = full[start : end+1]
-			*nodes = append(*nodes, node)
+			*members = append(*members, node)
 		}
 	case '[':
 		*i++
-		if bytes.Equal(name, nodenameCoordinates) {
+		if bytes.Equal(name, membername_coordinates) {
 			// On saute entièrement le tableau
 			skipArray(data, i)
 			end := *i
 			if name != nil {
-				node := &JsonNode{name, idx, level, full[start:end], false, parent}
+				node := &JsonMember{name, idx, level, full[start:end], false, parent}
 				parent = node
-				*nodes = append(*nodes, node)
+				*members = append(*members, node)
 			}
 		} else {
 			// On descend dans le tableau
-			parseArray(data, i, name, level, nodes, full, parent)
+			parseArray(data, i, name, level, members, full, parent)
 			skipSpaces(data, i)
 			*i++ // skip ']'
 		}
@@ -62,14 +62,14 @@ func parseValue(data []byte, i *int, name NodeName, idx int, level int, parent *
 	}
 
 	if terminal && name != nil {
-		node := &JsonNode{name, idx, level, full[start:*i], true, parent}
+		node := &JsonMember{name, idx, level, full[start:*i], true, parent}
 		parent = node
-		*nodes = append(*nodes, node)
+		*members = append(*members, node)
 	}
 }
 
 // parse un objet depuis un '{'
-func parseObject(data []byte, i *int, level int, nodes *[]*JsonNode, full []byte, parent *JsonNode) int {
+func parseObject(data []byte, i *int, level int, members *[]*JsonMember, full []byte, parent *JsonMember) int {
 	for {
 		skipSpaces(data, i)
 		if data[*i] == '}' {
@@ -79,7 +79,7 @@ func parseObject(data []byte, i *int, level int, nodes *[]*JsonNode, full []byte
 		key := readNodeName(data, i)
 		skipSpaces(data, i)
 		*i++ // skip ':'
-		parseValue(data, i, key, -1, level+1, parent, nodes, full)
+		parseValue(data, i, key, -1, level+1, parent, members, full)
 		skipSpaces(data, i)
 		if data[*i] == '}' {
 			*i++
@@ -89,7 +89,8 @@ func parseObject(data []byte, i *int, level int, nodes *[]*JsonNode, full []byte
 	}
 }
 
-func parseArray(data []byte, i *int, parentName NodeName, level int, nodes *[]*JsonNode, full []byte, parent *JsonNode) {
+// parse un tableau entier
+func parseArray(data []byte, i *int, parentName MemberName, level int, members *[]*JsonMember, full []byte, parent *JsonMember) {
 	idx := 0
 	for {
 		skipSpaces(data, i)
@@ -97,7 +98,7 @@ func parseArray(data []byte, i *int, parentName NodeName, level int, nodes *[]*J
 			return
 		}
 		// name := fmt.Sprintf("%s[%d]", parentName, idx)
-		parseValue(data, i, parentName, idx, level+1, parent, nodes, full)
+		parseValue(data, i, parentName, idx, level+1, parent, members, full)
 		idx++
 		skipSpaces(data, i)
 		if data[*i] == ']' {
@@ -149,7 +150,7 @@ func parseString(data []byte, i *int) {
 	}
 }
 
-func readNodeName(data []byte, i *int) NodeName {
+func readNodeName(data []byte, i *int) MemberName {
 	*i++ // skip opening "
 	start := *i
 	for *i < len(data) {
