@@ -1,26 +1,32 @@
 package main
 
 import (
-	"encoding/json"
-	"fmt"
 	"log"
 	"os"
 	"path/filepath"
 
+	"github.com/Appirit/go-carto/internal/geotools"
 	"github.com/Appirit/go-carto/internal/gpxparser"
 )
 
 func main() {
-	log.Println("*************")
+	log.Println("***********")
 	log.Println("*** GPX ***")
-	log.Println("*************")
+	log.Println("***********")
 	os.Chdir(must(filepath.Abs(`../../../testdata`))) // tous les outils nécessaires sont dans ce dossier
 
-	geogson, _ := gpxparser.ConvertToGeojson("activity_19441849900.gpx")
+	geogson := must(gpxparser.NewGeojsonFromGpxfile("Comps-Forerunner-Site.gpx"))
 	// geogson, _ := gpxparser.ConvertToGeojson("carroux.gpx")
+
+	for _, multiPoints := range geogson.MultiLineString {
+		for _, points := range multiPoints.Geometry.Coordinates {
+			geotools.Measure(geogson.Name, points)
+		}
+	}
+
 	// Sérialisation JSON
-	data, _ := json.MarshalIndent(geogson, "", "  ")
-	fmt.Println(string(data))
+	// data := must(json.MarshalIndent(geogson, "", "  "))
+	// fmt.Println(string(data))
 }
 
 func must[T any](val T, err error) T {
